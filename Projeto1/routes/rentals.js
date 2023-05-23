@@ -2,6 +2,7 @@ var express = require('express');
 var mysql = require('mysql')
 var router = express.Router();
 
+
 var connection = mysql.createConnection({
     host: 'localhost',
     user: 'root',
@@ -26,12 +27,12 @@ router.get('/', function(req, res, next) {
 router.post('/', (req, res,next) => {
 
 if (Object.keys(req.body).length==0){
-    res.status(400).send("Details not valid");
+    return res.status(400).send("Details not valid");
 }
 else{
     var rentals = req.body;
     connection.query('INSERT INTO rentals SET ?',rentals,(err,results)=>{
-      res.send(results);
+      res.status(200).end("Aluguer adicionado com sucesso, ID: " + results.insertId);
   })
 }
 });
@@ -39,9 +40,12 @@ else{
 // c. Selecionar todos os alugueres de um determinado cliente e devolver essa lista na resposta. (2
 //   valores)
   
-router.get('/:id', function(req, res, next) {
-    var id = req.params.id;
-    connection.query("SELECT * FROM persons WHERE id = ?",id,(err,results,fields)=>{
+router.get('/:customer', function(req, res, next) {
+    var customer = decodeURIComponent(req.params.customer);
+    connection.query("SELECT * FROM rentals WHERE customer LIKE ?","%"+customer+"%",(err,results,fields)=>{
+        if (err) {
+          return res.status(500).send('Erro na consulta');
+        };
         res.send(results);
     })
   });
@@ -49,39 +53,52 @@ router.get('/:id', function(req, res, next) {
 // d. Aplicar um desconto em percentagem no preço de um aluguer (via params) e atualizar a entrada.
 // Devolver a entrada atualizada na resposta. (2 valores)
 
-router.delete('/:id', function(req, res, next) {
+router.put('/:id/:discount', function(req, res, next) {
   var id = req.params.id;
-  connection.query("DELETE FROM persons WHERE id = ?",[id],(err,results,fields)=>{
-      res.send(results);
-  })
+  var discount = req.params.discount/100;
+  connection.query("SELECT * FROM rentals WHERE rentals_id = ?",[id],(err,results,fields)=>{
+      if (err) {
+        return res.status(500).send('Erro na consulta');
+      };
+      if (results.length === 0) {
+        return res.status(404).send('Aluguer não existe');
+      };
+      var rental = results[0];
+      var price = rental.price;
+      var totalDiscount = price * discount;
+      var newPrice = price-totalDiscount;
+
+      connection.query("UPDATE rentals SET price = ? WHERE rentals_id = ?",[newPrice,id],(err,results)=>{
+        if (err) {
+          return res.status(500).send('Erro ao atualizar o aluguer');
+        };
+        
+        connection.query("SELECT * FROM rentals WHERE rentals_id = ?",[id],(err,results,fields)=>{
+          if (err) {
+            return res.status(500).send('Erro na consulta');
+          };
+          res.send(results);
+        });
+      });
+  });
 });
 
 // e. Listar todos os alugueres anteriores a uma determinada data (via body) e devolver a lista na
 // resposta. (2 valores)
 
-router.get('/:age/:profession', function(req, res, next) {
-  var age = req.params.age;
-  var profession = req.params.profession;
-  connection.query("SELECT * FROM persons WHERE age = ? AND profession = ?",[age,profession],(err,results,fields)=>{
-      res.send(results);
-  })
+router.post('/date', function(req, res, next) {
+  var date = req.body.date;
+  connection.query("SELECT * FROM rentals WHERE DATE(pickup_date) <= ?",[date],(err,results,fields)=>{
+    if (err) {
+      return res.status(500).send('Error en la consulta');
+    };
+    if (results.length === 0) {
+      return res.status(404).send('Não existe aluguer antes da data selecionada');
+    };
+    res.send(results);
+  });
 });
 
 
-router.put('/:id', function(req,res,next){
-  var id = req.params.id;
-  var person = req.body;
-  connection.query('UPDATE persons SET ? WHERE id = ?', [person,id],(err,results,fields) =>{
-    if (err){
-      res.status(500).end("Error while performing query.")
-    }
-    else if (results.affectedRows == 0) {
-      res.status(400).end("Details not valid");
-    }else{
-
-      res.send(results);
-    }
-  })
-})
 
 module.exports = router;
