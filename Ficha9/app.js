@@ -1,147 +1,131 @@
-const express = require('express')
-const Sequelize = require('sequelize')
-
-const app = express()
+const express = require("express");
+const Sequelize = require("sequelize");
+// const swaggerUi = require('swagger-ui-express');
+const app = express();
 const port = 3000;
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('./swagger-output.json');
 
-//Middleware que converte o BODY para JSON
+app.use('/api-docs',swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use(express.json());
 
 app.listen(port, () => {
-    console.log("Server is running");
-})
-
-const sequelize = new Sequelize('ficha9_backend', 'root', '', {
-    dialect: 'mysql'
+  console.log("server is running");
 });
 
-sequelize.authenticate()
-    .then(() => {
-        console.log("Connection has been established");
-    })
-    .catch(err => {
-        console.error("Unable to connect", err);
-    })
-
-const Person = sequelize.define('person', {
-    firstName: {
-        type: Sequelize.STRING,
-        allowNull: false
-    },
-    lastName: {
-        type: Sequelize.STRING
-    },
-    profession: {
-        type: Sequelize.STRING
-    },
-    age: {
-        type: Sequelize.INTEGER
-    }
-}, {
-    //options
+const sequelize = new Sequelize("ficha9_backend", "root", "", {
+  dialect: "mysql",
 });
 
-sequelize.sync({ force: false })
-    .then(() => {
-        console.log('Database & tables created!');
-    }).then(function () {
-        return Person.findAll();
-    }).then(function (persons) {
-        console.log(persons);
-    });
+sequelize
+  .sync({force:false})
+  .then(() => {
+    console.log("connection has been established");
+  })
+  .catch((err) => {
+    console.log("Unable to connect", err);
+  });
 
+const Person = sequelize.define("person", {
+  firstName: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
+  lastName: {
+    type: Sequelize.STRING
+    // allowNull:false
+  },
+  profession: {
+    type: Sequelize.STRING
+  },
+  age: {
+    type: Sequelize.INTEGER
+  }
+});
+
+// comentar o bulkCreate para criar primero a tabela
 // Person.bulkCreate([
-//     { firstName: 'Roberto', lastName: 'Moniz', profession: 'student', age: 27 },
-//     { firstName: 'Saul', lastName: 'Abreu', profession: 'student', age: 22 },
-//     { firstName: 'Miguel', lastName: 'Peñaranda', profession: 'student', age: 20 },
-//     { firstName: 'Jackeline', lastName: 'Camara', profession: 'student', age: 18 }
-// ]).then(function () {
-//     return Person.findAll();
-// }).then(function (persons) {
-//     console.log(persons);
-// });
+//   { firstName: "Saul", lastName: "De Abreu", profession: "engineer", age: 23 },
+//   { firstName: "Ricardo", lastName: "Sousa", profession: "farmer", age: 26 },
+//   { firstName: "Roberto", lastName: "Moniz", profession: "photographer", age: 29,},
+//   { firstName: "Jack", lastName: "Camara", profession: "physician", age: 31 },
+//   { firstName: "Miguel", lastName: "Penaranda", profession: "pilot", age: 34 }
+// ]);
 
-app.get('/', function (req, res, next) {
+app.get("/", function (req, res, next) {
+    var id = req.query.id;
 
-    Person.findAll()
-        .then((people) => {
+    if (id==undefined){
+        Person.findAll()
+          .then((people) => {
             res.json(people);
         })
+        
+    }else{
+        Person.findByPk(id)
+        .then((results)=>{
+            if (results==null){
+                res.status(500).json("ID not exist");
+            }else{
+
+                res.json(results)
+            }
+        })
+        
+    }
+   
+});
+
+app.post("/", function (req, res, next) {
+    Person.create({ firstName: req.body.firstName, lastName: req.body.lastName, age: req.body.age})
+      .then((people) => {
+        res.json("id criado: "+people.id);
+      })
+      .catch((err) => {
+        console.log("Error:", err);
+        res.status(500).json({ error: "Error retrieving people" });
+      });
+  });
+
+
+app.delete("/", function (req, res, next) {
+    Person.destroy({
+        where: {
+            id: req.body.id
+        }
+    }).then((affectRows)=>{
+        if (affectRows==1){
+            res.status(200).json("Delete OK!")
+        }else{
+            res.status(500).json("Person not found!")
+        }
+    })
+});
+
+app.delete("/:id", function (req, res, next) {
+  var id = req.params.id;
+    Person.destroy({
+        where: {
+            id: id
+        }
+    }).then((affectRows)=>{
+            if (affectRows==1){
+                res.status(200).json("Delete OK!")
+            }else{
+                res.status(500).json("Person not found!")
+            }
+        })
         .catch((err) => {
-            console.log("Error", err);
-            res.status(500).json({ error: "Error retrieving people" });
+            console.log("Error:", err);
+            res.status(500).json(err);
         });
+});
+
+app.get("/", function (req, res, next) {
 
 });
 
-app.post('/', (req, res, next) => {
 
-    Person.create(req.body)
-        .then((people)=>{
-            res.json("Person create, ID: "+people.id);
-        })
-        .catch((err)=>{
-            console.log("Error", err);
-            res.status(500).json({ error: "Error creating person" });
-        })
-})
+app.get("/:Age/:Profession", function (req, res, next) {});
 
-app.delete('/', function (req, res, next) {
-    var id = req.body.id;
-    Person.destroy({
-        where: {
-            id: id
-        }
-    }).then(()=>{
-        res.json()
-    })
-});
-
-app.delete('/:id', function (req, res, next) {
-    var id = req.params.id;
-    Person.destroy({
-        where: {
-            id: id
-        }
-    }).then(()=>{
-        res.json()
-    })
-});
-
-
-app.get('/:id', function (req, res, next) {
-    var id = req.params.id;
-    connection.query("SELECT * FROM persons WHERE id = ?", id, (err, results, fields) => {
-        res.json(results);
-    })
-});
-
-
-
-
-
-
-app.get('/:age/:profession', function (req, res, next) {
-    var age = req.params.age;
-    var profession = req.params.profession;
-    connection.query("SELECT * FROM persons WHERE age = ? AND profession = ?", [age, profession], (err, results, fields) => {
-        res.send(results);
-    })
-});
-
-
-app.put('/:id', function (req, res, next) {
-    var id = req.params.id;
-    var person = req.body;
-    connection.query('UPDATE persons SET ? WHERE id = ?', [person, id], (err, results, fields) => {
-        if (err) {
-            res.status(500).end("Error while performing query.")
-        }
-        else if (results.affectedRows == 0) {
-            res.status(400).end("Details not valid");
-        } else {
-
-            res.send(results);
-        }
-    })
-})
+app.put("/:id", function (req, res, next) {});
