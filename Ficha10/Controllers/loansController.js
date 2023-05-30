@@ -18,9 +18,9 @@ exports.deleteLoanById = (req, res, next)=>{
         where: {
             id:id
         }
-    }).then(results)=>{
+    }).then((results)=>{
         res.send("Loan com o id "+id+"eliminado")
-    }
+    });
 };
 
 exports.updateLoanById = (req, res, next)=>{
